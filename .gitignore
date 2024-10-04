@@ -1,0 +1,21 @@
+# Ignore IntelliJ IDEA project files
+.idea/*
+
+.gitattributes
+
+# Ignore Python virtual environments
+python-tests/venv/
+
+# Ignore the run directory, used for testing servers or other temporary data
+run/
+
+# Ignore Gradle-related files
+.gradle/
+build/
+gradle/
+gradlew
+gradlew.bat
+
+# Ignore build output and distribution files
+/out/
+dist/
