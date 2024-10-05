@@ -1,18 +1,19 @@
 import requests
+import json
 
-# URL of the webhook server
 url = "http://localhost:8081"
 
-# Data to be sent to the webhook
 data = {
-    "postData": "Hello from Python test script!"
+    "playeruuid": "a061e888-bbe1-41cc-8630-f34f6c7b7762",
+    "commands": [
+        "say Hello, {playeruuid}!",
+        "give {playeruuid} minecraft:dirt 1"
+    ]
 }
 
-# Send POST request
 try:
-    response = requests.post(url, data=data)
+    response = requests.post(url, json=data, headers={"Content-Type": "application/json"})
 
-    # Print the response from the server
     print("Response status code:", response.status_code)
     print("Response body:", response.text)
 

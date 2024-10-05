@@ -1,6 +1,12 @@
-name: PlatinPayMinecraft
+name: PlatinPay
 main: cc.platinpay.minecraft.Main
 version: 1.0
 api-version: 1.20
 author: "@DatCodeMania"
-description: "PlatinPay Minecraft Plugin"
+description: "PlatinPay - an open-source Tebex alternative for Minecraft"
+
+commands:
+  platinpay:
+    description: General PlatinPay command
+    usage: /<command> [subcommand]
+    aliases: [store, shop]

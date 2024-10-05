@@ -1,11 +1,15 @@
 package cc.platinpay.minecraft;
 
 import fi.iki.elonen.NanoHTTPD;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class WebhookServer extends NanoHTTPD {
 
@@ -22,16 +26,56 @@ public class WebhookServer extends NanoHTTPD {
     public Response serve(IHTTPSession session) {
         if (Method.POST.equals(session.getMethod())) {
             try {
-                session.parseBody(new java.util.HashMap<>());
+                Map<String, String> files = new java.util.HashMap<>();
+                session.parseBody(files);
 
-                Map<String, List<String>> parameters = session.getParameters();
-                String postData = parameters.get("postData") != null ? parameters.get("postData").getFirst() : null;
+                String rawBody = files.get("postData");
 
-                plugin.getLogger().info("Received Webhook: " + postData);
+                if (rawBody != null) {
+                    JSONObject json = new JSONObject(rawBody);
 
-                return newFixedLengthResponse(Response.Status.OK, "application/json", "{\"status\":\"received\"}");
+                    if (json.has("commands") && json.get("commands") instanceof JSONArray) {
+                        JSONArray commands = json.getJSONArray("commands");
+                        if (json.has("playeruuid")) {
+                            for (int i = 0; i < commands.length(); i++) {
+                                String command = commands.getString(i);
+                                OfflinePlayer offlinePlayer;
+                                try {
+                                    offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(json.getString("playeruuid")));
+                                } catch (Exception e) {
+                                    String errorMessage = "{\"error\":\"Error parsing player UUID " + json.getString("playeruuid") + "\"}";
+                                    plugin.getLogger().severe("Error parsing player UUID" + json.getString("playeruuid") + " " + e.getMessage());
+                                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", errorMessage);
+                                }
+                                if (!offlinePlayer.hasPlayedBefore()) {
+                                    plugin.getLogger().severe("Player not played before: " + json.getString("playeruuid"));
+                                    String errorMessage = "{\"error\":\"Player not played before: " + json.getString("playeruuid") + "\"}";
+                                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", errorMessage);
+                                }
+                                if (offlinePlayer.getName() == null) {
+                                    plugin.getLogger().severe("Player name is null: " + json.getString("playeruuid"));
+                                    String errorMessage = "{\"error\":\"Player name is null: " + json.getString("playeruuid") + "\"}";
+                                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", errorMessage);
+                                }
+                                command = command.replace("{playeruuid}", offlinePlayer.getName());
+                                String finalCommand = command;
+                                Bukkit.getScheduler().runTask(plugin, () -> {
+                                    plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), finalCommand);
+                                });
+                            }
+                        } else {
+                            return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON structure. Expected 'playeruuid'.\"}");
+                        }
+                        return newFixedLengthResponse(Response.Status.OK, "application/json", "{\"status\":\"received\"}");
+                    } else {
+                        return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON structure. Expected 'commands' array.\"}");
+                    }
+                } else {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", "{\"error\":\"No data received.\"}");
+                }
 
             } catch (Exception e) {
+                plugin.getLogger().severe("Error processing webhook: " + e.getMessage());
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Internal Server Error");
             }
         }
