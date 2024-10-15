@@ -1,3 +1,16 @@
 [config]
 port = 8081
 storeLink = "none"
+blockedCommands = [
+    "stop",
+    "reload",
+    "restart",
+    "save-off",
+    "op",
+    "deop"
+]
+localOnly = true # If true, the plugin will only accept commands from the local machine, more secure
+whitelistOnly = false # Only necessary if localOnly is false
+whitelistedIPs = [
+    "127.0.0.1" # localhost; example
+]
