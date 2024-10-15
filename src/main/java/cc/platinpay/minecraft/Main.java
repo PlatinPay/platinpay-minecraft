@@ -3,6 +3,7 @@ package cc.platinpay.minecraft;
 import cc.platinpay.minecraft.commands.PlatinPayCommandHandler;
 import cc.platinpay.minecraft.commands.ReloadCommand;
 import cc.platinpay.minecraft.commands.ShopCommand;
+import cc.platinpay.minecraft.commands.TokenCommand;
 import com.moandjiezana.toml.Toml;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
@@ -24,6 +25,7 @@ public class Main extends JavaPlugin {
     private ShopCommand shopCommand;
     private Boolean localOnly;
     private Boolean whitelistOnly;
+    private Boolean useSigning;
 
     private Set<String> blockedCommandsSet;
 
@@ -52,7 +54,8 @@ public class Main extends JavaPlugin {
         shopCommand = new ShopCommand(storeLink);
 
         ReloadCommand reloadCommand = new ReloadCommand(this);
-        PlatinPayCommandHandler commandHandler = new PlatinPayCommandHandler(shopCommand, reloadCommand);
+        TokenCommand tokenCommand = new TokenCommand(this);
+        PlatinPayCommandHandler commandHandler = new PlatinPayCommandHandler(shopCommand, reloadCommand, tokenCommand);
 
         Objects.requireNonNull(this.getCommand("platinpay")).setExecutor(commandHandler);
     }
@@ -115,6 +118,7 @@ public class Main extends JavaPlugin {
             List<String> oldBlockedCommands = blockedCommands;
             Boolean oldLocalOnly = localOnly;
             Boolean oldWhitelistOnly = whitelistOnly;
+            Boolean oldUseSigning = useSigning;
 
             webhookPort = config.getLong("config.port", 8081L).intValue();
             storeLink = config.getString("config.storeLink", "none");
@@ -122,12 +126,14 @@ public class Main extends JavaPlugin {
             localOnly = config.getBoolean("config.localOnly", true);
             whitelistOnly = config.getBoolean("config.whitelistOnly", false);
             List<String> whitelistedIPs = config.getList("config.whitelistedIPs", List.of());
+            useSigning = config.getBoolean("config.useSigning", true);
 
             blockedCommandsSet = new HashSet<>(blockedCommands);
 
             getLogger().info("Config loaded successfully");
 
-            if (webhookServer != null && hasConfigChanged(oldWebhookPort, oldBlockedCommands, oldLocalOnly, oldWhitelistOnly)) {
+
+            if (webhookServer != null && hasConfigChanged(oldWebhookPort, oldBlockedCommands, oldLocalOnly, oldWhitelistOnly, oldUseSigning)) {
                 try {
                     webhookServer.stop();
                     if (localOnly) {
@@ -152,10 +158,11 @@ public class Main extends JavaPlugin {
         }
     }
     private boolean hasConfigChanged(Integer oldPort, List<String> oldBlockedCommands,
-                                     Boolean oldLocalOnly, Boolean oldWhitelistOnly) {
+                                     Boolean oldLocalOnly, Boolean oldWhitelistOnly, Boolean oldUseSigning) {
         return !webhookPort.equals(oldPort) ||
                 !Objects.equals(oldBlockedCommands, blockedCommands) ||
                 !Objects.equals(oldLocalOnly, localOnly) ||
-                !Objects.equals(oldWhitelistOnly, whitelistOnly);
+                !Objects.equals(oldWhitelistOnly, whitelistOnly) ||
+                !Objects.equals(oldUseSigning, useSigning);
     }
 }

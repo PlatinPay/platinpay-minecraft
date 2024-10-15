@@ -10,10 +10,12 @@ import org.jetbrains.annotations.NotNull;
 public class PlatinPayCommandHandler implements CommandExecutor {
     private final ShopCommand shopCommand;
     private final ReloadCommand reloadCommand;
+    private final TokenCommand tokenCommand;
 
-    public PlatinPayCommandHandler(ShopCommand shopCommand, ReloadCommand reloadCommand) {
+    public PlatinPayCommandHandler(ShopCommand shopCommand, ReloadCommand reloadCommand, TokenCommand tokenCommand) {
         this.shopCommand = shopCommand;
         this.reloadCommand = reloadCommand;
+        this.tokenCommand = tokenCommand;
     }
 
     @Override
@@ -22,6 +24,8 @@ public class PlatinPayCommandHandler implements CommandExecutor {
             return shopCommand.onCommand(sender, command, label, args);
         } else if (args.length == 1 && (args[0].equalsIgnoreCase("reload") || args[0].equalsIgnoreCase("rl"))) {
             return reloadCommand.onCommand(sender, command, label, args);
+        } else if (args.length == 2 && (args[0].equalsIgnoreCase("settoken") || args[0].equalsIgnoreCase("token"))) {
+            return tokenCommand.onCommand(sender, command, label, args);
         } else {
             sender.sendMessage(Main.PLATINPAY_PREFIX + ChatColor.RED + "Invalid command usage.");
             return false;

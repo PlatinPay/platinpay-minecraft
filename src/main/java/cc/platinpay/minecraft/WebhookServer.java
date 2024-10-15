@@ -1,5 +1,6 @@
 package cc.platinpay.minecraft;
 
+import cc.platinpay.minecraft.utils.TokenManager;
 import fi.iki.elonen.NanoHTTPD;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -10,11 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.security.PublicKey;
+import java.security.Signature;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public class WebhookServer extends NanoHTTPD {
 
@@ -74,6 +74,7 @@ public class WebhookServer extends NanoHTTPD {
             plugin.getLogger().severe("Whitelist-only mode enabled but no IPs whitelisted.");
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Internal Server Error");
         }
+
         String remoteIP = session.getRemoteIpAddress();
         if (whitelistOnly && !isAuthorizedIP(remoteIP)) {
             plugin.getLogger().severe("Unauthorized request from IP: " + remoteIP);
@@ -82,25 +83,43 @@ public class WebhookServer extends NanoHTTPD {
 
         if (Method.POST.equals(session.getMethod())) {
             try {
-                Map<String, String> files = new java.util.HashMap<>();
+                Map<String, String> files = new HashMap<>();
                 session.parseBody(files);
                 String rawBody = files.get("postData");
 
                 if (rawBody != null) {
-                    JSONObject json = new JSONObject(rawBody);
-                    if (json.has("commands") && json.get("commands") instanceof JSONArray && json.has("playeruuid")) {
-                        JSONArray commands = json.getJSONArray("commands");
+                    JSONObject requestBody = new JSONObject(rawBody);
+                    String signature = requestBody.getString("signature");
+                    JSONObject dataObject = requestBody.getJSONObject("data");
+
+                    // Ensure the timestamp is present
+                    if (!dataObject.has("timestamp")) {
+                        return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json",
+                                "{\"error\":\"Missing timestamp.\"}");
+                    }
+
+                    if (!isSignatureValid(dataObject, signature)) {
+                        plugin.getLogger().severe("Invalid signature.");
+                        return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain", "Invalid signature.");
+                    }
+
+                    if (dataObject.has("commands") && dataObject.get("commands") instanceof JSONArray &&
+                            dataObject.has("playeruuid")) {
+
+                        JSONArray commands = dataObject.getJSONArray("commands");
                         if (commands.isEmpty()) {
                             return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json",
                                     "{\"error\":\"Commands array cannot be empty.\"}");
                         }
-                        return processCommands(json);
+
+                        return processCommands(dataObject);
                     } else {
                         return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json",
                                 "{\"error\":\"Invalid JSON structure. Expected 'commands' array and 'playeruuid'.\"}");
                     }
                 } else {
-                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", "{\"error\":\"No data received.\"}");
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json",
+                            "{\"error\":\"No data received.\"}");
                 }
 
             } catch (Exception e) {
@@ -108,6 +127,7 @@ public class WebhookServer extends NanoHTTPD {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Internal Server Error");
             }
         }
+
         return newFixedLengthResponse(Response.Status.METHOD_NOT_ALLOWED, "text/plain", "Only POST requests are allowed");
     }
 
@@ -154,5 +174,33 @@ public class WebhookServer extends NanoHTTPD {
     private boolean isBlockedCommand(String command) {
         String baseCommand = command.split("\\s+")[0];
         return blockedCommandsSet.contains(baseCommand.toLowerCase());
+    }
+
+    private boolean isSignatureValid(JSONObject dataObject, String signature) {
+        try {
+            long timestamp = dataObject.getLong("timestamp");
+            long currentTime = System.currentTimeMillis() / 1000;
+
+            if (Math.abs(currentTime - timestamp) > 40) {
+                plugin.getLogger().severe("Invalid timestamp: Request too old or in the future.");
+                return false;
+            }
+
+            String dataString = dataObject.toString();
+
+            TokenManager tokenManager = new TokenManager(plugin.getDataFolder());
+            PublicKey publicKey = tokenManager.loadPublicKey();
+
+            Signature sig = Signature.getInstance("Ed25519");
+            sig.initVerify(publicKey);
+            sig.update(dataString.getBytes());
+
+            byte[] signatureBytes = Base64.getDecoder().decode(signature);
+            return sig.verify(signatureBytes);
+
+        } catch (Exception e) {
+            plugin.getLogger().severe("Signature validation failed: " + e.getMessage());
+            return false;
+        }
     }
 }

@@ -10,7 +10,8 @@ blockedCommands = [
     "deop"
 ]
 localOnly = true # If true, the plugin will only accept commands from the local machine, more secure
-whitelistOnly = false # Only necessary if localOnly is false
+whitelistOnly = false # Only used if localOnly is false
 whitelistedIPs = [
     "127.0.0.1" # localhost; example
 ]
+useSigning = true # If true, the plugin will use HMAC to verify inbound requests to the API
