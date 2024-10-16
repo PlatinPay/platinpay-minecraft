@@ -15,3 +15,4 @@ whitelistedIPs = [
     "127.0.0.1" # localhost; example
 ]
 useSigning = true # If true, the plugin will use HMAC to verify inbound requests to the API
+# This token is set in game, see /platinpay help

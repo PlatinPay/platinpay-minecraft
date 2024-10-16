@@ -8,11 +8,13 @@ import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 
 public class PlatinPayCommandHandler implements CommandExecutor {
+    private final HelpCommand helpCommand;
     private final ShopCommand shopCommand;
     private final ReloadCommand reloadCommand;
     private final TokenCommand tokenCommand;
 
     public PlatinPayCommandHandler(ShopCommand shopCommand, ReloadCommand reloadCommand, TokenCommand tokenCommand) {
+        this.helpCommand = new HelpCommand();
         this.shopCommand = shopCommand;
         this.reloadCommand = reloadCommand;
         this.tokenCommand = tokenCommand;
@@ -20,7 +22,9 @@ public class PlatinPayCommandHandler implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
-        if (args.length == 0) {
+        if ((args.length == 0) || (args.length == 1 && args[0].equalsIgnoreCase("help"))) {
+            return helpCommand.onCommand(sender, command, label, args);
+        } else if (args.length == 1 && args[0].equalsIgnoreCase("shop")) {
             return shopCommand.onCommand(sender, command, label, args);
         } else if (args.length == 1 && (args[0].equalsIgnoreCase("reload") || args[0].equalsIgnoreCase("rl"))) {
             return reloadCommand.onCommand(sender, command, label, args);

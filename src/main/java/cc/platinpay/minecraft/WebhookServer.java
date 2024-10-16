@@ -25,27 +25,31 @@ public class WebhookServer extends NanoHTTPD {
     private final List<String> whitelistedIPs;
     private final Boolean whitelistOnly;
     private final Set<String> blockedCommandsSet;
+    private final Boolean useSigning;
 
     private WebhookServer(String hostname, int webhookPort, JavaPlugin plugin,
                           Set<String> blockedCommandsSet, Boolean whitelistOnly,
-                          List<String> whitelistedIPs) throws IOException {
+                          List<String> whitelistedIPs, Boolean useSigning) throws IOException {
         super(hostname, webhookPort);
         this.plugin = plugin;
         this.blockedCommandsSet = blockedCommandsSet;
         this.whitelistedIPs = whitelistedIPs;
         this.whitelistOnly = whitelistOnly;
+        this.useSigning = useSigning;
 
         start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
         plugin.getLogger().info("Webhook server started on port " + webhookPort);
     }
 
-    public static WebhookServer createLocalServer(JavaPlugin plugin, int webhookPort, Set<String> blockedCommandsSet) throws IOException {
-        return new WebhookServer("localhost", webhookPort, plugin, blockedCommandsSet, false, null);
+    public static WebhookServer createLocalServer(JavaPlugin plugin, int webhookPort,
+                                                  Set<String> blockedCommandsSet, Boolean useSigning) throws IOException {
+        return new WebhookServer("localhost", webhookPort, plugin, blockedCommandsSet, false, null, useSigning);
     }
 
-    public static WebhookServer createGlobalServer(JavaPlugin plugin, int webhookPort, Set<String> blockedCommandsSet,
-                                                   Boolean whitelistOnly, List<String> whitelistedIPs) throws IOException {
-        return new WebhookServer(null, webhookPort, plugin, blockedCommandsSet, whitelistOnly, whitelistedIPs);
+    public static WebhookServer createGlobalServer(JavaPlugin plugin, int webhookPort,
+                                                   Set<String> blockedCommandsSet, Boolean whitelistOnly,
+                                                   List<String> whitelistedIPs, Boolean useSigning) throws IOException {
+        return new WebhookServer(null, webhookPort, plugin, blockedCommandsSet, whitelistOnly, whitelistedIPs, useSigning);
     }
 
     public static void initLogger(File logFile) throws IOException {
@@ -92,7 +96,6 @@ public class WebhookServer extends NanoHTTPD {
                     String signature = requestBody.getString("signature");
                     JSONObject dataObject = requestBody.getJSONObject("data");
 
-                    // Ensure the timestamp is present
                     if (!dataObject.has("timestamp")) {
                         return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json",
                                 "{\"error\":\"Missing timestamp.\"}");
@@ -178,6 +181,9 @@ public class WebhookServer extends NanoHTTPD {
 
     private boolean isSignatureValid(JSONObject dataObject, String signature) {
         try {
+            if (!useSigning) {
+                return true;
+            }
             long timestamp = dataObject.getLong("timestamp");
             long currentTime = System.currentTimeMillis() / 1000;
 

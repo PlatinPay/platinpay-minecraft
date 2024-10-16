@@ -4,6 +4,7 @@ import cc.platinpay.minecraft.commands.PlatinPayCommandHandler;
 import cc.platinpay.minecraft.commands.ReloadCommand;
 import cc.platinpay.minecraft.commands.ShopCommand;
 import cc.platinpay.minecraft.commands.TokenCommand;
+import cc.platinpay.minecraft.utils.TokenManager;
 import com.moandjiezana.toml.Toml;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
@@ -26,8 +27,7 @@ public class Main extends JavaPlugin {
     private Boolean localOnly;
     private Boolean whitelistOnly;
     private Boolean useSigning;
-
-    private Set<String> blockedCommandsSet;
+    private Boolean firstRun = true;
 
     public static final String PLATINPAY_PREFIX =
             ChatColor.BOLD + "" +
@@ -40,16 +40,6 @@ public class Main extends JavaPlugin {
     public void onEnable() {
         loadConfig();
         getLogger().info("PlatinPay enabled");
-
-        try {
-        if (localOnly) {
-            webhookServer = WebhookServer.createLocalServer(this, webhookPort, blockedCommandsSet);
-        } else {
-            webhookServer = WebhookServer.createGlobalServer(this, webhookPort, blockedCommandsSet, whitelistOnly, null);
-        }} catch (IOException e) {
-            getLogger().severe("Failed to start webhook server: " + e.getMessage());
-            Bukkit.getPluginManager().disablePlugin(this);
-        }
 
         shopCommand = new ShopCommand(storeLink);
 
@@ -97,13 +87,17 @@ public class Main extends JavaPlugin {
                     boolean created = commandLogFile.createNewFile();
                     if (!created) {
                         getLogger().warning("Log file (commands.log) already exists or could not be created.");
-                        WebhookServer.initLogger(commandLogFile);
+                    } else {
+                        getLogger().info("Log file (commands.log) created.");
                     }
                 } catch (IOException e) {
                     getLogger().severe("Failed to initialize command logger: " + e.getMessage());
                     Bukkit.getPluginManager().disablePlugin(this);
                 }
             }
+            getLogger().info("Initializing logger...");
+            WebhookServer.initLogger(commandLogFile);
+            getLogger().info("Initialized logger...");
 
             Toml config = new Toml();
             try {
@@ -128,22 +122,35 @@ public class Main extends JavaPlugin {
             List<String> whitelistedIPs = config.getList("config.whitelistedIPs", List.of());
             useSigning = config.getBoolean("config.useSigning", true);
 
-            blockedCommandsSet = new HashSet<>(blockedCommands);
+            Set<String> blockedCommandsSet = new HashSet<>(blockedCommands);
+
+            if (useSigning) {
+                TokenManager tokenManager = new TokenManager(getDataFolder());
+                if (!tokenManager.publicKeyExists()) {
+                    getLogger().warning(
+                            "Public key not found. Webhook server will not start. " +
+                                    "Please set the public key and reload the config with /platinpay reload."
+                    );
+                    return;
+                }
+            }
 
             getLogger().info("Config loaded successfully");
 
 
-            if (webhookServer != null && hasConfigChanged(oldWebhookPort, oldBlockedCommands, oldLocalOnly, oldWhitelistOnly, oldUseSigning)) {
+            if ((webhookServer != null && hasConfigChanged(oldWebhookPort, oldBlockedCommands, oldLocalOnly, oldWhitelistOnly, oldUseSigning)) || firstRun) {
                 try {
-                    webhookServer.stop();
-                    if (localOnly) {
-                        webhookServer = WebhookServer.createLocalServer(this, webhookPort, blockedCommandsSet);
-                    } else {
-                        webhookServer = WebhookServer.createGlobalServer(this, webhookPort, blockedCommandsSet, whitelistOnly, whitelistedIPs);
+                    if (webhookServer != null) {
+                        webhookServer.stop();
                     }
-                    getLogger().info("Webhook server restarted with new configuration.");
+                    if (localOnly) {
+                        webhookServer = WebhookServer.createLocalServer(this, webhookPort, blockedCommandsSet, useSigning);
+                    } else {
+                        webhookServer = WebhookServer.createGlobalServer(this, webhookPort, blockedCommandsSet, whitelistOnly, whitelistedIPs, useSigning);
+                    }
+                    getLogger().info("Webhook server (re)started with (new) configuration.");
                 } catch (IOException e) {
-                    getLogger().severe("Failed to restart webhook server: " + e.getMessage());
+                    getLogger().severe("Failed to (re)start webhook server: " + e.getMessage());
                     Bukkit.getPluginManager().disablePlugin(this);
                 }
             }
@@ -156,6 +163,7 @@ public class Main extends JavaPlugin {
             getLogger().severe("Failed to load config: " + e.getMessage());
             Bukkit.getPluginManager().disablePlugin(this);
         }
+        firstRun = false;
     }
     private boolean hasConfigChanged(Integer oldPort, List<String> oldBlockedCommands,
                                      Boolean oldLocalOnly, Boolean oldWhitelistOnly, Boolean oldUseSigning) {

@@ -8,5 +8,5 @@ description: "PlatinPay - an open-source Tebex alternative for Minecraft"
 commands:
   platinpay:
     description: General PlatinPay command
-    usage: /<command> [subcommand]
+    usage: /platinpay help
     aliases: [store, shop]

@@ -3,8 +3,11 @@ package cc.platinpay.minecraft.utils;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.KeyFactory;
 import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 public class TokenManager {
@@ -17,12 +20,10 @@ public class TokenManager {
 
     public void setPublicKey(PublicKey publicKey) throws IOException {
         byte[] encodedKey = publicKey.getEncoded();
-        String pemKey = "-----BEGIN PUBLIC KEY-----\n" +
-                Base64.getEncoder().encodeToString(encodedKey) +
-                "\n-----END PUBLIC KEY-----";
+        String base64Key = Base64.getEncoder().encodeToString(encodedKey);
 
         try (FileWriter writer = new FileWriter(publicKeyFile)) {
-            writer.write(pemKey);
+            writer.write(base64Key);
         }
     }
 
@@ -31,14 +32,17 @@ public class TokenManager {
             throw new IOException("Public key file not found.");
         }
 
-        String pem = Files.readString(publicKeyFile.toPath());
-        String base64Key = pem
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replaceAll("\\s", "");
+        String base64Key = Files.readString(publicKeyFile.toPath(), StandardCharsets.UTF_8).trim();
 
         byte[] decodedKey = Base64.getDecoder().decode(base64Key);
-        return java.security.KeyFactory.getInstance("Ed25519")
-                .generatePublic(new java.security.spec.X509EncodedKeySpec(decodedKey));
+
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decodedKey);
+        KeyFactory keyFactory = KeyFactory.getInstance("Ed25519");
+
+        return keyFactory.generatePublic(keySpec);
+    }
+
+    public Boolean publicKeyExists() {
+        return publicKeyFile.exists();
     }
 }
