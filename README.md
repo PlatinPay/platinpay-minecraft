@@ -1,6 +1,6 @@
 # PlatinPay-Minecraft
 
-[Find the main README here!](https://github.com/PlatinPay)
+[Find the main README here! (It has a showcase video and deployment links so you can try PlatinPay yourself!)](https://github.com/PlatinPay)
 
 This is the Minecraft plugin for the PlatinPay project.
 
